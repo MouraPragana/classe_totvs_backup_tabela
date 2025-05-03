@@ -84,5 +84,5 @@ C:\TOTVS\Protheus12\system\backup\SA1_20240520\14-30-00\
 Distribuído sob licença MIT. Veja [LICENSE](https://github.com/MouraPragana/classe_totvs_backup_tabela/blob/master/LICENSE) para detalhes.
 
 ---
-**Desenvolvido por** [Mateus Pragana](https://github.com/seu-usuario)  
+**Desenvolvido por** [Mateus Pragana](https://github.com/MouraPragana)
 **Última atualização**: 02/05/2025
