@@ -1,0 +1,232 @@
+#include 'totvs.ch'
+#include 'tlpp-core.th'
+
+/*/{Protheus.doc} Backup
+Classe responsável por realizar backup de tabelas do Protheus, incluindo estrutura completa.
+Cria uma cópia física dos dados em formato DTC.
+@type class
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@example
+Local oBackup := Backup():New("SA1")
+/*/
+class Backup  
+    public data _lBackUpRealizado as logical
+
+    public method new(cTabela) constructor
+    private method criarPasta(cPasta as character) as logical
+    private method mostrarErro(cTabela as character)
+    private method buscarCampos(aCampos as array, cTabela as character)
+    private method iniciarBackup(cTabelaOrigem as character, cNomeArquivo as character, cExtensao as character, cFiltro as character, cBackupTabelaHoraFolder as character)
+endClass
+
+/*/{Protheus.doc} Backup::New
+Construtor da classe que inicia o processo de backup completo.
+Prepara ambiente, verifica existência da tabela, cria estrutura de pastas e inicia a cópia dos dados.
+A pasta de backup segue o padrão: [RootPath]\[StartPath]\backup\[Tabela]_[Data]\[Hora]\
+@type method
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@param cTabela, character, Nome da tabela (alias) a ser backupeada (ex: "SA1")
+@param cFiltro, character, (Opcional) Condição de filtro no padrão ADVPL (ex: "SA1->A1_FILIAL == '01'")
+@return object, Retorna instância da classe Backup
+@example
+Local oBackup := Backup():New("SB1", "B1_FILIAL == '01' .AND. B1_MSBLQL != '1'")
+/*/
+Method New(cTabela as character, cFiltro as character) class Backup
+    Local aAreas                                         as array
+    Local cBackupFolder                                  as character
+    Local cBackupTabelaFolder                            as character
+    Local cBackupTabelaHoraFolder                        as character
+    Local cBaseFolder                                    as character
+    Local cData                                          as character
+    Local cHora                                          as character
+    Local lContinua, lAmbientePreparado, lPastasPrepadas as logical
+
+    Default cTabela := ""
+    Default cFiltro := ""
+
+    Try 
+        aAreas      := {FwGetAreA()}
+        cData       := DToS(Date())
+        cHora       := StrTran(Time(),":","-")
+        cBaseFolder := GetSrvProfString("StartPath", "")
+        cPathFolder := GetSrvProfString("RootPath", "")
+
+        cBackupFolder           := cPathFolder + cBaseFolder + "backup"
+        cBackupTabelaFolder     := cBackupFolder + "\" + cTabela + "_" + cData
+        cBackupTabelaHoraFolder := cBackupTabelaFolder + "\" + cHora
+        lAmbientePreparado      := .F.
+        lContinua               := .F.
+
+        If Select("SX2") == 0
+            lAmbientePreparado := RpcSetEnv("99","01",,,"EST",,,,,,)
+        Else
+            lAmbientePreparado := .T.
+        EndIf
+
+        If lAmbientePreparado
+            If !Empty(AllTrim(cTabela)) .AND. ExisteSX2(cTabela)
+                lContinua       := .T.
+                cNomeArquivo    := cTabela + "_" + cData + "_" + cHora
+                cExtensao       := ".dtc"
+                lPastasPrepadas := Self:criarPasta(cBackupFolder) .AND. Self:criarPasta(cBackupTabelaFolder) .AND. Self:criarPasta(cBackupTabelaHoraFolder)
+                
+                If lPastasPrepadas
+                    Self:iniciarBackup(cTabela, cNomeArquivo, cExtensao, cFiltro, cBackupTabelaHoraFolder)
+                Else
+                    If !IsBlind()
+                        FwAlertError("Houve algum problema na criação das pastas, operação será cancelada", "Atenção.")
+                    EndIf
+                EndIf
+            Else
+                lContinua := .F.
+
+                If !IsBlind()
+                    Self:mostrarErro(cTabela)
+                EndIf
+            EndIf
+        Else
+            lContinua := .F.
+        EndIf
+
+        Self:_lBackUpRealizado := lContinua
+        aEval(aAreas, {|aArea| FwRestArea(aArea)})
+    Catch oError
+        Self:_lBackUpRealizado := .F.
+
+        If !IsBlind()
+            FWAlertError("Houve o erro [" + oError:Description + "]. Contate o adminsitrador do sistema." , "Falha de execução.")
+        EndIf
+    ENDTRY
+Return Self
+
+/*/{Protheus.doc} Backup::criarPasta
+Método utilitário que verifica e cria diretórios físicos quando não existentes.
+Garante a existência da estrutura completa de pastas necessária para o backup.
+@type method
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@param cPasta, character, Caminho completo do diretório a ser criado/validado
+@example
+Self:criarPasta("C:\TOTVS\Protheus12\system\backup\SA1_20240501")
+/*/
+Method criarPasta(cPasta as character) as logical class Backup
+    Local lPastaCriada as logical
+    lPastaCriada := .T.
+
+    If !ExistDir(cPasta)
+        If MakeDir(cPasta) > 0
+            lPastaCriada := .F.
+        EndIf
+    EndIf
+
+Return lPastaCriada
+
+/*/{Protheus.doc} Backup::mostrarErro
+Exibe mensagem de erro contextualizada via FwAlertError.
+Trata dois cenários: tabela não informada ou tabela inexistente no dicionário.
+@type method
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@param cTabela, character, Nome da tabela que falhou na validação (pode ser vazio)
+@example
+Self:mostrarErro("ZX9") // Tabela inexistente
+Self:mostrarErro("")    // Tabela não informada
+/*/
+Method mostrarErro(cTabela as character) class Backup
+    Local cMsg as character
+
+    If !Empty(AllTrim(cTabela))
+        cMsg := "A tabela informada [" + cTabela + "] não foi encontrada no dicionário de dados."
+    Else
+        cMsg := "Não foi informada uma tabela válida para utilização da classe Backup."
+    EndIf
+
+    FwAlertError(cMsg, "Atenção!")
+Return
+
+/*/{Protheus.doc} Backup::buscarCampos
+Obtém a estrutura completa de campos da tabela através da função DbStruct().
+O array retornado contém todas as colunas com seus respectivos tipos, tamanhos e decimais.
+@type method
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@param aCampos, array, Parâmetro por referência que receberá a estrutura da tabela
+@param cTabela, character, Alias da tabela a ser analisada
+@example
+Local aCampos := {}
+Self:buscarCampos(@aCampos, "SA1")
+// aCampos conterá: {{"A1_COD","C",6,0}, {"A1_LOJA","C",2,0}, ...}
+/*/
+Method buscarCampos(aCampos as array, cTabela as character) class Backup
+    aCampos := &(cTabela)->(DbStruct())
+Return
+
+
+/*/{Protheus.doc} Backup::iniciarBackup
+Executa o processo completo de backup:
+1. Prepara área de trabalho
+2. Cria tabela destino com mesma estrutura
+3. Aplica filtros quando existentes
+4. Copia todos os registros
+5. Fecha áreas de trabalho
+@type method
+@version 12.1.2410
+@author Mateus Pragana
+@since 01/05/2025
+@param cTabelaOrigem, character, Alias da tabela origem
+@param cNomeArquivo, character, Nome base do arquivo de backup (sem extensão)
+@param cExtensao, character, Extensão do arquivo (normalmente ".dtc")
+@param cFiltro, character, Expressão de filtro em ADVPL
+@param cBackupTabelaHoraFolder, character, Caminho completo da pasta de destino
+@example
+Self:iniciarBackup("SA1", "SA1_20240501_1430", ".dtc", "SA1->A1_MSBLQL != '1'", "C:\...\SA1_20240501\14-30")
+/*/
+Method iniciarBackup(cTabelaOrigem as character, cNomeArquivo as character, cExtensao as character, cFiltro as character, cBackupTabelaHoraFolder as character) class Backup
+    Local aCampos        as array
+    Local cTabelaDestino as character
+    Local nX             as numeric
+    Local cSysPath       as character
+
+    aCampos        := {}
+    cTabelaDestino := GetNextAlias()
+    cSysPath       := right(cBackupTabelaHoraFolder, len(cBackupTabelaHoraFolder) - rat("system", cBackupTabelaHoraFolder) + 2)
+
+    If Select(cTabelaOrigem) == 0
+        DbSelectArea(cTabelaOrigem)
+    EndIf
+    
+    Self:buscarCampos(@aCampos, cTabelaOrigem)
+    
+    dbCreate(cSysPath + "\" + cNomeArquivo, aCampos, "CTREECDX")
+    dbUseArea(.T., "CTREECDX", cSysPath + "\" + cNomeArquivo + cExtensao, cTabelaDestino, .F., .F.)
+
+    If !Empty(AllTrim(cFiltro))
+        (cTabelaOrigem)->(DbSetFilter({|| &(cFiltro)}, cFiltro))
+    EndIf
+
+    (cTabelaOrigem)->(DbGoTop())
+    While (cTabelaOrigem)->(!Eof())
+        If Reclock(cTabelaDestino, .T.)
+            For nX := 1 to len(aCampos)
+                (cTabelaDestino)->&(aCampos[nX][1]) := (cTabelaOrigem)->&(aCampos[nX][1])
+            Next nX
+            (cTabelaDestino)->(MsUnlock())
+        EndIf
+        (cTabelaOrigem)->(DbSkip())
+    EndDo
+
+    If Select(cTabelaOrigem) > 0
+        (cTabelaOrigem)->(DbCloseArea())
+    EndIf
+
+    If Select(cTabelaDestino) > 0
+        (cTabelaDestino)->(DbCloseArea())
+    EndIf
+Return
