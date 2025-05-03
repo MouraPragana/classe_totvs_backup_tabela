@@ -63,6 +63,8 @@ C:\TOTVS\Protheus12\system\backup\SA1_20240520\14-30-00\
 - [TLPP Include](https://tdn.totvs.com/pages/viewpage.action?pageId=619741238) (include obrigatório)
 - Permissões de escrita no servidor
 - Espaço disponível no servidor
+- Compilar a customização
+- Instanciar a classe
 
 ## 🛠️ Roadmap
 ✔️ **Versão 1.0** - Backup básico  
