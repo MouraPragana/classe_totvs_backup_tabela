@@ -1,6 +1,6 @@
 # 📦 Classe Backup ADVPL para TOTVS Protheus
 
-[![ADVPL](https://img.shields.io/badge/Language-ADVPL-blue)](https://www.totvs.com.br)
+![TLPP](https://img.shields.io/badge/Language-TLPP-blue)
 [![Protheus](https://img.shields.io/badge/ERP-Protheus-success)](https://www.totvs.com.br/protheus/)
 [![License](https://img.shields.io/badge/License-MIT-green)](LICENSE)
 
