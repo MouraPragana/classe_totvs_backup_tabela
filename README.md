@@ -79,7 +79,7 @@ C:\TOTVS\Protheus12\system\backup\SA1_20240520\14-30-00\
 5. Abra um Pull Request
 
 ## 📄 Licença
-Distribuído sob licença MIT. Veja [LICENSE](LICENSE) para detalhes.
+Distribuído sob licença MIT. Veja [LICENSE](https://github.com/MouraPragana/classe_totvs_backup_tabela/blob/master/LICENSE) para detalhes.
 
 ---
 **Desenvolvido por** [Mateus Pragana](https://github.com/seu-usuario)  
